@@ -22,7 +22,7 @@ This project demonstrates a **full-stack Django application** integrated with **
   - Total assessments passed
   - User progress overview  
 - Quick navigation to Tutorials, Assessments, and Profile sections  
-![Home Page](sensen_security/screenshots/home_placeholder.jpg)
+![Home Page](final_sensen_security/sensen_security/screenshots/assessments_placeholder.jpg)
 
 ### 📝 Assessments
 - Secure exam environment with:
