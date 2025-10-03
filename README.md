@@ -54,6 +54,3 @@ This project demonstrates a **full-stack Django application** integrated with **
 | Database    | SQLite              |
 | Security    | Robust exam controls, keyboard & tab restrictions |
 
----
-
-## 🗂️ Project Structure
