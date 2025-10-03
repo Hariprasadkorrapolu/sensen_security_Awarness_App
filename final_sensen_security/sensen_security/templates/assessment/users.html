@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}All Users{% endblock %}
+
+{% block content %}
+<h2 class="text-center mb-4">User Details</h2>
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<div class="table-responsive">
+    <table id="usersTable" class="table table-striped table-bordered">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Users</h4>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="fas fa-user-plus me-1"></i> Add User
+    </button>
+</div>
+        <thead>
+            <tr>
+                <th>Emp ID</th>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Phone Number</th>
+                <th>Profile Picture</th>
+                <th>Date Joined</th>
+                <th>Last Login</th>
+                <th>Edit</th>
+                <th>Reset Password</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for profile in profiles %}
+            <!-- Edit Modal -->
+            <div class="modal fade" id="editModal{{ profile.user.id }}" tabindex="-1" aria-labelledby="editModalLabel{{ profile.user.id }}" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <form method="post" action="{% url 'admin_edit_profile' profile.user.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="editModalLabel{{ profile.user.id }}">Edit User - {{ profile.user.first_name }}</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="mb-3">
+                        <label>Email:</label>
+                        <input type="email" class="form-control" name="email" value="{{ profile.user.email }}" required>
+                      </div>
+                      <div class="mb-3">
+                        <label>First Name:</label>
+                        <input type="text" class="form-control" name="first_name" value="{{ profile.user.first_name }}" required>
+                      </div>
+                      <div class="mb-3">
+                        <label>Last Name:</label>
+                        <input type="text" class="form-control" name="last_name" value="{{ profile.user.last_name }}" required>
+                      </div>
+                      <div class="mb-3">
+                        <label>Phone Number:</label>  
+                        <input type="text" class="form-control" name="phone_number" value="{{ profile.phone_number }}">
+                      </div>
+                      <div class="mb-3">
+                        <label>Profile Picture:</label><br>
+                        {% if profile.profile_image %}
+                          <img src="{{ profile.profile_image.url }}" alt="Profile Pic" width="50" height="50" class="mb-2" style="border-radius: 50%;">
+                        {% endif %}
+                        <input type="file" class="form-control" name="profile_image" accept="image/*">
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                      <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table Row -->
+            <tr>
+                <td>{{ profile.emp_id }}</td>
+                <td>{{ profile.user.email }}</td>
+                <td>{{ profile.user.first_name }} {{ profile.user.last_name }}</td>
+                <td>{{ profile.phone_number }}</td>
+                <td>
+                    {% if profile.profile_image %}
+                        <img src="{{ profile.profile_image.url }}" alt="Profile Pic" width="50" height="50" style="border-radius: 50%;">
+                    {% else %}
+                        No Image
+                    {% endif %}
+                </td>
+                <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+                <td>{{ profile.user.last_login|default:"Never" }}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ profile.user.id }}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </td>
+               <td>
+    <button onclick="sendReset('{{ profile.user.email }}')" class="btn btn-sm btn-danger">
+        <i ></i> Reset
+    </button>
+</td> 
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="resetPasswordForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          Are you sure you want to send a password reset link to <strong id="resetEmailTarget"></strong>?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Send Reset Email</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'admin_add_user' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label>Email:</label>
+            <input type="email" class="form-control" name="email" required>
+          </div>
+          <div class="mb-3">
+            <label>Emp ID:</label>
+            <input type="text" class="form-control" name="emp_id" required>
+          </div>
+          <div class="mb-3">
+            <label>First Name:</label>
+            <input type="text" class="form-control" name="first_name" required>
+          </div>
+          <div class="mb-3">
+            <label>Last Name:</label>
+            <input type="text" class="form-control" name="last_name" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  $(document).ready(function () {
+      $('#usersTable').DataTable();
+  });
+
+  let selectedUserId = null;
+
+  function openResetModal(userId, email) {
+    selectedUserId = userId;
+    document.getElementById("resetEmailTarget").innerText = email;
+    new bootstrap.Modal(document.getElementById('resetPasswordModal')).show();
+  }
+
+// document.addEventListener('DOMContentLoaded', () => {
+//   const form = document.querySelector('#addUserModal form');
+//   form.addEventListener('submit', function (e) {
+//     e.preventDefault(); // Prevent default form submission
+
+//     const email = form.email.value.trim();
+//     const emp_id = form.emp_id.value.trim();
+//     const first_name = form.first_name.value.trim();
+//     const last_name = form.last_name.value.trim();
+
+//     fetch("{% url 'admin_add_user' %}", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "X-CSRFToken": '{{ csrf_token }}',
+//       },
+//       body: JSON.stringify({
+//         email,
+//         emp_id,
+//         first_name,
+//         last_name,
+//       }),
+//     })
+//     .then(response => response.json().then(data => ({ status: response.status, body: data })))
+//     .then(({ status, body }) => {
+//       if (status === 200) {
+//         alert(body.message);
+//         window.location.reload();  // Or optionally append the new row to DataTable
+//       } else {
+//         alert("⚠️ " + body.message);
+//         console.error("Validation Error:", body.message);
+//       }
+//     })
+//     .catch(error => {
+//       alert("❌ An unexpected error occurred.");
+//       console.error("Fetch Error:", error);
+//     });
+//   });
+// });
+
+ function sendReset(email) {
+    if (confirm(`Send a new password to ${email}?`)) {
+        fetch(`/custom-admin/reset-password/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email })
+        })
+        .then(response => response.json())
+        .then(data => alert(data.message))
+        .catch(error => console.error("Error:", error));
+    }
+}
+</script>
+{% endblock %}

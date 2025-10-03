@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sensen Security Awareness{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <style>
+        .navbar-brand { font-weight: bold; color: #2c3e50 !important; }
+        .progress-circle { width: 100px; height: 100px; }
+        .timer-display { font-size: 1.5rem; font-weight: bold; color: #dc3545; }
+        .question-nav { position: fixed; left: 20px; top: 50%; transform: translateY(-50%); z-index: 1000; }
+        .kiosk-mode { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: white; z-index: 9999; overflow: auto; }
+        .leaderboard-item { transition: all 0.3s ease; }
+        .leaderboard-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    {% if not kiosk_mode %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <i class="fas fa-shield-alt me-2"></i>Sensen Security
+            </a>
+            <div class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                    <a class="nav-link" href="{% url 'home' %}"><i class="fas fa-home me-1"></i>Home</a>
+                    <a class="nav-link" href="{% url 'assessments_list' %}"><i class="fas fa-tasks me-1"></i>Assessments</a>
+                    <a class="nav-link" href="{% url 'tutorials' %}"><i class="fas fa-play-circle me-1"></i>Tutorials</a>
+                    {% if user.is_staff %}
+                        <!-- <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-bar me-1"></i>Dashboard</a> -->
+                        <a class="nav-link" href="{% url 'upload_assessment' %}"><i class="fas fa-upload me-1"></i>Upload</a>
+                    {% endif %}
+                    <a class="nav-link" href="{% url 'profile' %}"><i class="fa fa-user" aria-hidden="true"></i> Profile</a>
+                    <a class="nav-link" href="{% url 'users' %}"><i class="fa fa-user-group" aria-hidden="true"></i> Users</a>
+                    <a class="nav-link" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt me-1"></i>Logout ({{ user.username }})</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="{% if not kiosk_mode %}container mt-4{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% if messages %}
+    <div id="bottom-alert-container" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1055; min-width: 300px;">
+        {% for message in messages %}
+        <div class="alert 
+            {% if message.tags == 'success' %}alert-success
+            {% elif message.tags == 'error' %}alert-danger
+            {% elif message.tags == 'warning' %}alert-warning
+            {% else %}alert-info
+            {% endif %}" role="alert" style="margin-bottom: 10px;">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Auto-hide messages in 3 seconds
+        setTimeout(() => {
+            const alertContainer = document.getElementById('bottom-alert-container');
+            if (alertContainer) {
+                alertContainer.style.transition = "opacity 0.5s ease";
+                alertContainer.style.opacity = "0";
+                setTimeout(() => alertContainer.remove(), 500);
+            }
+        }, 3000);
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

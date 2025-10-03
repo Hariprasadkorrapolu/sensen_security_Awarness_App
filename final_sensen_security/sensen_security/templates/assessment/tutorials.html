@@ -1,0 +1,596 @@
+{% extends 'base.html' %}
+
+{% block title %}Tutorials - Sensen Security{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-play-circle me-2"></i>Security Awareness Tutorials</h2>
+</div>
+
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoModalLabel">Tutorial Video</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="ratio ratio-16x9">
+                    <iframe id="tutorialVideo" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold">Progress</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 8px;">
+                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="d-flex justify-content-end align-items-center">
+                        <div id="completionBadge" class="badge bg-success" style="display: none;">
+                            <i class="fas fa-check me-1"></i>Completed
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% for tutorial in tutorials %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <!-- YouTube Thumbnail -->
+            <div class="position-relative">
+                <img src="" 
+                     class="card-img-top youtube-thumbnail" 
+                     alt="{{ tutorial.title }} thumbnail"
+                     data-video-url="{{ tutorial.video_url }}"
+                     style="height: 200px; object-fit: cover;">
+            </div>
+            
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">{{ tutorial.title }}</h5>
+                <p class="card-text flex-grow-1">{{ tutorial.description|truncatewords:20 }}</p>
+                
+                <!-- Progress indicator on card -->
+                <div class="mb-2">
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar" id="cardProgress{{ tutorial.id }}" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted tutorial-progress" data-tutorial-id="{{ tutorial.id }}">Not started</small>
+                </div>
+                
+                <div class="mt-auto">
+                    <span class="badge bg-secondary mb-2">{{ tutorial.category }}</span>
+                    <div class="d-grid">
+                        <button class="btn btn-primary watch-tutorial-btn" 
+                                data-video-url="{{ tutorial.video_url }}" 
+                                data-tutorial-id="{{ tutorial.id }}"
+                                data-tutorial-title="{{ tutorial.title }}">
+                            <i class="fas fa-play me-2"></i>Watch Tutorial
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            <i class="fas fa-info-circle me-2"></i>No tutorials available at the moment.
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+.youtube-thumbnail {
+    transition: transform 0.3s ease;
+}
+
+.card:hover .youtube-thumbnail {
+    transform: scale(1.02);
+}
+
+.tutorial-progress {
+    font-weight: 500;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Video progress tracking with YouTube API
+    let currentTutorialId = null;
+    let progressInterval = null;
+    let youtubePlayer = null;
+    let maxProgressReached = {}; // Track maximum progress reached for each tutorial
+    let isPlayerReady = false;
+    let hasResumed = false;
+    let lastKnownTime = 0;
+    let currentPlaybackPosition = 0; // Track current playback position separately
+    
+    // Function to extract YouTube video ID from URL
+    function getYouTubeVideoId(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+    
+    // Function to get YouTube thumbnail URL
+    function getYouTubeThumbnailUrl(videoUrl, quality = 'maxresdefault') {
+        const videoId = getYouTubeVideoId(videoUrl);
+        if (videoId) {
+            return `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
+        }
+        return 'https://via.placeholder.com/480x360/cccccc/666666?text=No+Thumbnail';
+    }
+    
+    // Function to load YouTube thumbnails
+    function loadYouTubeThumbnails() {
+        const thumbnails = document.querySelectorAll('.youtube-thumbnail');
+        
+        thumbnails.forEach(thumbnail => {
+            const videoUrl = thumbnail.getAttribute('data-video-url');
+            const thumbnailUrl = getYouTubeThumbnailUrl(videoUrl);
+            
+            const testImg = new Image();
+            testImg.onload = function() {
+                thumbnail.src = thumbnailUrl;
+            };
+            testImg.onerror = function() {
+                const fallbackUrl = getYouTubeThumbnailUrl(videoUrl, 'mqdefault');
+                const fallbackImg = new Image();
+                fallbackImg.onload = function() {
+                    thumbnail.src = fallbackUrl;
+                };
+                fallbackImg.onerror = function() {
+                    thumbnail.src = getYouTubeThumbnailUrl(videoUrl, 'default');
+                };
+                fallbackImg.src = fallbackUrl;
+            };
+            testImg.src = thumbnailUrl;
+        });
+    }
+    
+    // Cookie helper functions
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+    
+    function setCookie(name, value, days = 30) {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+    }
+    
+    // Get current user ID
+    const currentUserId = '{{ user.id }}';
+    const progressCookieName = `tutorialProgress_${currentUserId}`;
+    
+    const savedProgress = getCookie(progressCookieName);
+    const tutorialProgress = savedProgress ? JSON.parse(decodeURIComponent(savedProgress)) : {};
+    
+    // Initialize maxProgressReached from saved data
+    Object.keys(tutorialProgress).forEach(tutorialId => {
+        maxProgressReached[tutorialId] = tutorialProgress[tutorialId].maxProgress || tutorialProgress[tutorialId].progress || 0;
+    });
+    
+    // Function to sync progress with server
+    async function syncProgressWithServer(tutorialId, maxProgress, currentPosition, completed) {
+        try {
+            const response = await fetch('/api/tutorial-progress/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken') || '',
+                },
+                body: JSON.stringify({
+                    tutorial_id: tutorialId,
+                    progress: maxProgress,
+                    current_position: currentPosition,
+                    completed: completed
+                })
+            });
+            
+            if (!response.ok) {
+                console.warn('Failed to sync progress with server');
+            }
+        } catch (error) {
+            console.warn('Error syncing progress:', error);
+        }
+    }
+    
+    // Function to load progress from server
+    async function loadProgressFromServer() {
+        try {
+            const response = await fetch('/api/tutorial-progress/');
+            if (response.ok) {
+                const serverProgress = await response.json();
+                
+                Object.keys(serverProgress).forEach(tutorialId => {
+                    tutorialProgress[tutorialId] = serverProgress[tutorialId];
+                    maxProgressReached[tutorialId] = serverProgress[tutorialId].maxProgress || serverProgress[tutorialId].progress || 0;
+                });
+                
+                setCookie(progressCookieName, encodeURIComponent(JSON.stringify(tutorialProgress)));
+                loadSavedProgress();
+            }
+        } catch (error) {
+            console.warn('Error loading progress from server:', error);
+        }
+    }
+    
+    // Initialize YouTube Player with proper resume functionality
+    function initializeYouTubePlayer(videoId, tutorialId) {
+        if (youtubePlayer && youtubePlayer.destroy) {
+            youtubePlayer.destroy();
+        }
+        
+        isPlayerReady = false;
+        hasResumed = false;
+        lastKnownTime = 0;
+        currentPlaybackPosition = 0;
+        
+        if (typeof YT !== 'undefined' && YT.Player) {
+            const videoContainer = document.querySelector('#tutorialVideo').parentNode;
+            videoContainer.innerHTML = '<div id="tutorialVideo"></div>';
+            
+            youtubePlayer = new YT.Player('tutorialVideo', {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: {
+                    'autoplay': 0,
+                    'rel': 0,
+                    'modestbranding': 1,
+                    'controls': 1,
+                    'enablejsapi': 1
+                },
+                events: {
+                    'onReady': function(event) {
+                        isPlayerReady = true;
+                        console.log('Player ready');
+                        
+                        const savedData = tutorialProgress[tutorialId];
+                        const savedMaxProgress = maxProgressReached[tutorialId] || 0;
+                        const savedCurrentPosition = savedData?.currentPosition || 0;
+                        
+                        // Update UI to show saved max progress
+                        updateProgressDisplay(tutorialId, savedMaxProgress);
+                        
+                        // Resume from saved current position (not max progress)
+                        if (savedCurrentPosition > 0 && !hasResumed) {
+                            const duration = event.target.getDuration();
+                            if (duration > 0) {
+                                const resumeTime = (savedCurrentPosition / 100) * duration;
+                                console.log(`Resuming from ${savedCurrentPosition}% (${resumeTime}s), max progress: ${savedMaxProgress}%`);
+                                event.target.seekTo(resumeTime, true);
+                                lastKnownTime = resumeTime;
+                                currentPlaybackPosition = savedCurrentPosition;
+                                hasResumed = true;
+                            }
+                        }
+                        
+                        startRealTimeTracking(tutorialId);
+                        
+                        setTimeout(() => {
+                            event.target.playVideo();
+                        }, 1000);
+                    },
+                    'onStateChange': function(event) {
+                        console.log('State changed:', event.data);
+                        if (event.data === YT.PlayerState.PLAYING) {
+                            startRealTimeTracking(tutorialId);
+                        } else if (event.data === YT.PlayerState.PAUSED) {
+                            if (youtubePlayer && isPlayerReady) {
+                                const currentTime = youtubePlayer.getCurrentTime();
+                                const duration = youtubePlayer.getDuration();
+                                if (duration > 0 && currentTime >= 0) {
+                                    let pausedPosition = (currentTime / duration) * 100;
+                                    
+                                    // Apply same logic for paused state - only 100% in last 1 second
+                                    const timeRemaining = duration - currentTime;
+                                    if (timeRemaining <= 1 || currentTime >= duration - 0.5) {
+                                        pausedPosition = 100;
+                                    } else {
+                                        pausedPosition = Math.min(pausedPosition, 99);
+                                    }
+                                    
+                                    currentPlaybackPosition = pausedPosition;
+                                    updateProgress(tutorialId, pausedPosition);
+                                }
+                            }
+                        } else if (event.data === YT.PlayerState.ENDED) {
+                            // Video actually ended, now it's truly 100%
+                            updateProgress(tutorialId, 100);
+                            stopRealTimeTracking();
+                        }
+                    }
+                }
+            });
+        } else {
+            console.warn('YouTube API not available, using fallback');
+            const embedUrl = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${window.location.origin}&autoplay=1&rel=0&modestbranding=1`;
+            const videoIframe = document.getElementById('tutorialVideo');
+            if (videoIframe) {
+                videoIframe.src = embedUrl;
+            }
+            startSimulatedTracking(tutorialId);
+        }
+    }
+    
+    // FIXED: Real-time tracking that maintains max progress
+    function startRealTimeTracking(tutorialId) {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
+        
+        console.log('Starting real-time tracking for tutorial:', tutorialId);
+        
+        progressInterval = setInterval(() => {
+            if (youtubePlayer && youtubePlayer.getCurrentTime && youtubePlayer.getDuration && isPlayerReady) {
+                try {
+                    const currentTime = youtubePlayer.getCurrentTime();
+                    const duration = youtubePlayer.getDuration();
+                    
+                    if (duration > 0 && currentTime >= 0) {
+                        // Calculate current position percentage with better precision
+                        let currentPositionPercent = (currentTime / duration) * 100;
+                        
+                        // Only mark as 100% if we're within the last 1 second OR actually at the end
+                        const timeRemaining = duration - currentTime;
+                        if (timeRemaining <= 1 || currentTime >= duration - 0.5) {
+                            currentPositionPercent = 100;
+                        } else {
+                            // Cap at 99% until we're actually near the end
+                            currentPositionPercent = Math.min(currentPositionPercent, 99);
+                        }
+                        
+                        // Update current playback position (this can go backward)
+                        currentPlaybackPosition = currentPositionPercent;
+                        
+                        // Check if user has seeked
+                        const timeDifference = Math.abs(currentTime - lastKnownTime);
+                        const hasUserSeeked = timeDifference > 2;
+                        
+                        if (hasUserSeeked) {
+                            console.log(`User seeked from ${lastKnownTime.toFixed(1)}s to ${currentTime.toFixed(1)}s`);
+                        }
+                        
+                        // Update progress (this handles max progress logic)
+                        updateProgress(tutorialId, currentPositionPercent);
+                        
+                        // Update last known time
+                        lastKnownTime = currentTime;
+                        
+                        const currentMaxProgress = maxProgressReached[tutorialId] || 0;
+                        console.log(`Position: ${currentPositionPercent.toFixed(1)}% (${timeRemaining.toFixed(1)}s left), Max Progress: ${currentMaxProgress.toFixed(1)}%`);
+                        
+                        // Only stop tracking when actually completed
+                        if (currentPositionPercent >= 100) {
+                            stopRealTimeTracking();
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Error tracking progress:', error);
+                }
+            }
+        }, 500);
+    }
+    
+    function stopRealTimeTracking() {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            console.log('Stopped real-time tracking');
+        }
+    }
+    
+    function startSimulatedTracking(tutorialId) {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
+        
+        let progress = maxProgressReached[tutorialId] || 0;
+        
+        progressInterval = setInterval(() => {
+            progress += 1;
+            updateProgress(tutorialId, progress);
+            
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+            }
+        }, 1000);
+    }
+    
+    // FIXED: Progress update function that preserves max progress
+    function updateProgress(tutorialId, currentPosition) {
+        const clampedPosition = Math.min(Math.max(currentPosition, 0), 100);
+        
+        // Get current max progress
+        const currentMaxProgress = maxProgressReached[tutorialId] || 0;
+        
+        // Only update max progress if current position is greater
+        const newMaxProgress = Math.max(currentMaxProgress, clampedPosition);
+        
+        // Update max progress reached
+        maxProgressReached[tutorialId] = newMaxProgress;
+        
+        // Update display with MAX progress (not current position)
+        updateProgressDisplay(tutorialId, newMaxProgress);
+        
+        // Save both max progress and current position
+        tutorialProgress[tutorialId] = {
+            progress: newMaxProgress, // For backward compatibility
+            maxProgress: newMaxProgress, // Maximum progress reached
+            currentPosition: clampedPosition, // Current playback position
+            completed: newMaxProgress >= 100
+        };
+        
+        // Persist to cookies
+        setCookie(progressCookieName, encodeURIComponent(JSON.stringify(tutorialProgress)));
+        
+        // Sync with server
+        syncProgressWithServer(tutorialId, newMaxProgress, clampedPosition, newMaxProgress >= 100);
+        
+        console.log(`Updated - Current Position: ${clampedPosition.toFixed(1)}%, Max Progress: ${newMaxProgress.toFixed(1)}%`);
+    }
+    
+    // Display function shows MAX progress, not current position
+    function updateProgressDisplay(tutorialId, maxProgress) {
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const completionBadge = document.getElementById('completionBadge');
+        const cardProgress = document.getElementById(`cardProgress${tutorialId}`);
+        const cardProgressText = document.querySelector(`[data-tutorial-id="${tutorialId}"]`);
+        
+        const roundedProgress = Math.round(maxProgress);
+        
+        // Update modal progress
+        if (progressBar) {
+            progressBar.style.width = `${maxProgress}%`;
+            progressBar.setAttribute('aria-valuenow', roundedProgress);
+        }
+        if (progressPercent) {
+            progressPercent.textContent = `${roundedProgress}%`;
+        }
+        
+        // Update completion badge
+        if (completionBadge) {
+            completionBadge.style.display = maxProgress >= 100 ? 'inline-block' : 'none';
+        }
+        
+        // Update card progress
+        if (cardProgress) {
+            cardProgress.style.width = `${maxProgress}%`;
+        }
+        
+        if (cardProgressText) {
+            if (maxProgress >= 100) {
+                cardProgressText.textContent = 'Completed ✓';
+                cardProgressText.className = 'text-success small fw-bold';
+            } else if (maxProgress > 0) {
+                cardProgressText.textContent = `${roundedProgress}% watched`;
+                cardProgressText.className = 'text-primary small fw-bold';
+            } else {
+                cardProgressText.textContent = 'Not started';
+                cardProgressText.className = 'text-muted small';
+            }
+        }
+    }
+    
+    // Load saved progress for cards
+    function loadSavedProgress() {
+        Object.keys(tutorialProgress).forEach(tutorialId => {
+            const data = tutorialProgress[tutorialId];
+            const maxProgress = data.maxProgress || data.progress || 0;
+            updateProgressDisplay(tutorialId, maxProgress);
+        });
+    }
+    
+    // Handle watch tutorial button clicks
+    document.querySelectorAll('.watch-tutorial-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const videoUrl = this.getAttribute('data-video-url');
+            const tutorialId = this.getAttribute('data-tutorial-id');
+            const tutorialTitle = this.getAttribute('data-tutorial-title');
+            
+            currentTutorialId = tutorialId;
+            const videoId = getYouTubeVideoId(videoUrl);
+            
+            console.log('Opening tutorial:', tutorialTitle, 'ID:', tutorialId);
+            
+            const modalTitle = document.getElementById('videoModalLabel');
+            if (modalTitle) {
+                modalTitle.textContent = tutorialTitle;
+            }
+            
+            const modalElement = document.getElementById('videoModal');
+            if (modalElement && typeof bootstrap !== 'undefined') {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+                
+                setTimeout(() => {
+                    if (videoId) {
+                        initializeYouTubePlayer(videoId, tutorialId);
+                    } else {
+                        console.warn('Invalid video URL:', videoUrl);
+                    }
+                }, 500);
+            }
+        });
+    });
+    
+    // Stop tracking when modal is closed
+    const videoModal = document.getElementById('videoModal');
+    if (videoModal) {
+        videoModal.addEventListener('hidden.bs.modal', function() {
+            console.log('Modal closed, cleaning up');
+            stopRealTimeTracking();
+            
+            // Save current position before closing
+            if (youtubePlayer && isPlayerReady && currentTutorialId) {
+                try {
+                    const currentTime = youtubePlayer.getCurrentTime();
+                    const duration = youtubePlayer.getDuration();
+                    if (duration > 0 && currentTime >= 0) {
+                        let finalPosition = (currentTime / duration) * 100;
+                        
+                        // Apply same completion logic - only 100% in last 1 second
+                        const timeRemaining = duration - currentTime;
+                        if (timeRemaining <= 1 || currentTime >= duration - 0.5) {
+                            finalPosition = 100;
+                        } else {
+                            finalPosition = Math.min(finalPosition, 99);
+                        }
+                        
+                        updateProgress(currentTutorialId, finalPosition);
+                        console.log(`Saved final position: ${finalPosition.toFixed(1)}% (${timeRemaining.toFixed(1)}s remaining)`);
+                    }
+                } catch (error) {
+                    console.warn('Error saving final progress:', error);
+                }
+            }
+            
+            // Clean up YouTube player
+            if (youtubePlayer && youtubePlayer.destroy) {
+                youtubePlayer.destroy();
+                youtubePlayer = null;
+            }
+            
+            // Reset flags
+            isPlayerReady = false;
+            hasResumed = false;
+            currentTutorialId = null;
+            lastKnownTime = 0;
+            currentPlaybackPosition = 0;
+            
+            // Clear iframe container
+            const videoContainer = document.querySelector('#tutorialVideo').parentNode;
+            videoContainer.innerHTML = '<iframe id="tutorialVideo" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+        });
+    }
+    
+    // Initialize everything when page loads
+    loadYouTubeThumbnails();
+    
+    loadProgressFromServer().then(() => {
+        loadSavedProgress();
+    }).catch(() => {
+        loadSavedProgress();
+    });
+});
+</script>
+
+<!-- Load YouTube API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+{% endblock %}

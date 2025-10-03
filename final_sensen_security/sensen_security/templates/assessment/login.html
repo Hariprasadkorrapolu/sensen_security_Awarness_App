@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Login - Sensen Security{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header text-center">
+                <h3><i class="fas fa-shield-alt text-primary me-2"></i> Security Login</h3>
+            </div>
+            <div class="card-body">
+                {% if user.is_authenticated %}
+                    <div class="alert alert-info">
+                        <strong>Debug:</strong> You are already logged in as {{ user.username }}
+                        <a href="{% url 'home' %}" class="btn btn-sm btn-primary ms-2">Go to Home</a>
+                    </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    {# Hidden next field if provided #}
+                    {% if request.GET.next %}
+                        <input type="hidden" name="next" value="{{ request.GET.next }}">
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email"
+                               value="{{ request.POST.email|default:'' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </button>
+                    <div class="text-center mt-2">
+                        <a href="{% url 'forgot_password' %}" class="text-decoration-none small">Forgot Password?</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    console.log('Login page loaded');
+    console.log('User authenticated:', {{ user.is_authenticated|yesno:"true,false" }});
+    console.log('Current path:', window.location.pathname);
+</script>
+{% endblock %}

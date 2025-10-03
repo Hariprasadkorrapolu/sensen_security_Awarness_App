@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Results - {{ assessment.title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <!-- Result Header -->
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    {% if attempt.is_passed %}
+                        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                        <h2 class="text-success mt-2">Congratulations!</h2>
+                        <p class="lead">You passed the assessment!</p>
+                    {% else %}
+                        <i class="fas fa-times-circle text-danger" style="font-size: 4rem;"></i>
+                        <h2 class="text-danger mt-2">Assessment Not Passed</h2>
+                        <p class="lead">Don't worry, you can retake the assessment.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3">
+                        <h4 class="text-primary">{{ attempt.score }}%</h4>
+                        <small class="text-muted">Final Score</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-success">{{ attempt.correct_answers }}</h4>
+                        <small class="text-muted">Correct Answers</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-info">{{ attempt.total_questions }}</h4>
+                        <small class="text-muted">Total Questions</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-warning">{{ assessment.pass_score }}%</h4>
+                        <small class="text-muted">Pass Score</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <a href="{% url 'assessments_list' %}" class="btn btn-primary me-2">
+                    <i class="fas fa-list me-2"></i>Back to Assessments
+                </a>
+                {% if not attempt.is_passed %}
+                    <a href="{% url 'take_assessment' assessment.id %}?retake=1" class="btn btn-warning me-2">
+                        <i class="fas fa-redo me-2"></i>Retake Assessment
+                    </a>
+                {% endif %}
+                <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-home me-2"></i>Home
+                </a>
+            </div>
+        </div>
+{% endblock %}

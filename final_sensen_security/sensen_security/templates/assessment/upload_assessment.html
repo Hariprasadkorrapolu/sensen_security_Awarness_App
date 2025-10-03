@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block title %}Upload CSV - Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-upload me-2"></i>Upload CSV File</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <!-- CSV Type Selection -->
+                    <div class="mb-3">
+                        <label for="csv_type" class="form-label">CSV Type</label>
+                        <select class="form-select" id="csv_type" name="csv_type" required>
+                            <option value="">Select CSV Type</option>
+                            <option value="assessment">Assessment CSV</option>
+                            <option value="url">URL CSV</option>
+                            <option value="local_url">Local URL CSV</option>
+                        </select>
+                        <div class="form-text">Choose the type of CSV file you want to upload.</div>
+                    </div>
+                    
+                    <!-- File Upload -->
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSV File</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">Upload your CSV file according to the selected type format.</div>
+                    </div>
+                                         
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload CSV
+                    </button>
+                    <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </form>
+            </div>
+        </div>
+
+        <!-- CSV Format Instructions -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle me-2"></i>CSV Format Instructions</h5>
+            </div>
+            <div class="card-body" id="instructions-container">
+                <!-- This will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csvTypeSelect = document.getElementById('csv_type');
+    const instructionsContainer = document.getElementById('instructions-container');
+    
+    // Define all instruction content
+    const instructionsContent = {
+        default: `
+            <p>Please select a CSV type above to view the specific format requirements and examples.</p>
+        `,
+        assessment: `
+            <h6><i class="fas fa-clipboard-list me-2"></i>Assessment CSV Format</h6>
+            <p>Your Assessment CSV file should contain the following columns:</p>
+            <ul>
+                <li><strong>assessment_title</strong> - Name of the assessment</li>
+                <li><strong>question_text</strong> - The question text</li>
+                <li><strong>correct_answer</strong> - The correct answer</li>
+                <li><strong>question_type</strong> - Either "multiple_choice" or "true_false" (optional, defaults to "multiple_choice")</li>
+                <li><strong>options</strong> - For multiple choice questions, separate options with "|" (optional)</li>
+                <li><strong>explanation</strong> - Explanation for the answer (optional)</li>
+                <li><strong>description</strong> - Assessment description (optional)</li>
+                <li><strong>time_limit</strong> - Time limit per question in seconds (optional, defaults to 30)</li>
+                <li><strong>pass_score</strong> - Pass score percentage (optional, defaults to 70)</li>
+            </ul>
+            
+            <h6>Example Assessment CSV Row:</h6>
+            <div class="bg-light p-3 rounded">
+                <code>
+                    Phishing Awareness,What is phishing?,A type of cyber attack,multiple_choice,A type of fish|A type of cyber attack|A software bug,A phishing attack is a type of social engineering attack...,Security Assessment,30,70
+                </code>
+            </div>
+        `,
+        url: `
+            <h6><i class="fab fa-youtube me-2"></i>URL CSV Format (YouTube Only)</h6>
+            <p>Your URL CSV file should contain the following columns:</p>
+            <ul>
+                <li><strong>name</strong> - Name or title for the YouTube video (required)</li>
+                <li><strong>link</strong> - YouTube URL only (required)</li>
+            </ul>
+            <p><strong>Note:</strong> Only YouTube links are accepted for URL CSV uploads.</p>
+            
+            <h6>Example URL CSV Row:</h6>
+            <div class="bg-light p-3 rounded">
+                <code>
+                    Python Tutorial,https://www.youtube.com/watch?v=dQw4w9WgXcQ
+                </code>
+            </div>
+        `,
+        local_url: `
+            <h6><i class="fas fa-video me-2"></i>Local URL CSV Format (Mp4 Only)</h6>
+            <p>Your Local URL CSV file should contain the following columns:</p>
+            <ul>
+                <li><strong>name</strong> - Name or identifier for the video file (required)</li>
+                <li><strong>m</strong> - Path to the Mp4 video file (required)</li>
+            </ul>
+            <p><strong>Note:</strong> Only Mp4 video files are accepted for local URL CSV uploads.</p>
+            
+            <h6>Example Local URL CSV Row:</h6>
+            <div class="bg-light p-3 rounded">
+                <code>
+                    Training Video 1,/media/videos/training_01.m4v
+                </code>
+            </div>
+        `
+    };
+    
+    // Function to update instructions
+    function updateInstructions(type) {
+        const content = instructionsContent[type] || instructionsContent.default;
+        instructionsContainer.innerHTML = content;
+    }
+    
+    // Event listener for dropdown change
+    csvTypeSelect.addEventListener('change', function() {
+        const selectedType = this.value;
+        if (selectedType === '') {
+            // Hide all instructions when no type is selected
+            instructionsContainer.innerHTML = '';
+        } else {
+            updateInstructions(selectedType);
+        }
+    });
+    
+    // Initially hide all instructions (no type selected by default)
+    instructionsContainer.innerHTML = '';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,632 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ assessment.title }} - Assessment{% endblock %}
+
+{% block content %}
+<div class="{% if kiosk_mode %}kiosk-mode p-4{% endif %}">
+    <div class="{% if not kiosk_mode %}container{% else %}w-100{% endif %}">
+        <!-- Assessment Header -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h3>{{ assessment.title }}</h3>
+                <p class="text-muted">{{ assessment.description }}</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="timer-display text-primary" id="timer">00:00</div>
+                <small class="text-muted">Time elapsed</small>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress mb-4" style="height: 6px;">
+            <div class="progress-bar bg-primary" id="progressBar" style="width: 0%"></div>
+        </div>
+
+        <!-- Question Container -->
+        <div id="questionContainer">
+            {% for question in questions %}
+            <div class="question-slide" data-question="{{ forloop.counter0 }}" 
+                 data-question-id="{{ question.id }}"
+                 data-correct-answer="{{ question.correct_answer }}"
+                 style="display: {% if forloop.first %}block{% else %}none{% endif %};">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Question <span class="question-number">{{ forloop.counter }}</span> of {{ questions|length }}</h5>
+                            <span class="badge bg-primary">{{ question.get_question_type_display }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="card-title">{{ question.question_text }}</h6>
+                        
+                        {% if question.question_type == 'multiple_choice' %}
+                            <div class="options-container" data-question-id="{{ question.id }}">
+                                {% for option in question.options %}
+                                <div class="form-check mb-2 option-item">
+                                    <input class="form-check-input" type="radio" 
+                                           name="question_{{ question.id }}" 
+                                           value="{{ option }}" 
+                                           id="q{{ question.id }}_{{ forloop.counter }}"
+                                           onchange="handleAnswerChange(this)">
+                                    <label class="form-check-label" for="q{{ question.id }}_{{ forloop.counter }}">
+                                        {{ option }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% elif question.question_type == 'true_false' %}
+                            <div class="options-container" data-question-id="{{ question.id }}">
+                                <div class="form-check mb-2 option-item">
+                                    <input class="form-check-input" type="radio" 
+                                           name="question_{{ question.id }}" 
+                                           value="True" 
+                                           id="q{{ question.id }}_true"
+                                           onchange="handleAnswerChange(this)">
+                                    <label class="form-check-label" for="q{{ question.id }}_true">True</label>
+                                </div>
+                                <div class="form-check mb-2 option-item">
+                                    <input class="form-check-input" type="radio" 
+                                           name="question_{{ question.id }}" 
+                                           value="False" 
+                                           id="q{{ question.id }}_false"
+                                           onchange="handleAnswerChange(this)">
+                                    <label class="form-check-label" for="q{{ question.id }}_false">False</label>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Answer Feedback Area -->
+                        <div class="answer-feedback mt-3" style="display: none;">
+                            <div class="alert" role="alert"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+            <button class="btn btn-outline-secondary" id="prevBtn" onclick="changeQuestion(-1)" disabled>
+                <i class="fas fa-chevron-left me-2"></i>Previous
+            </button>
+            <div>
+                <button class="btn btn-danger me-2" id="exitBtn" onclick="confirmExitExam()" style="display: none;">
+                    <i class="fas fa-times me-2"></i>Exit Exam
+                </button>
+                <button class="btn btn-primary" id="nextBtn" onclick="changeQuestion(1)">
+                    Next<i class="fas fa-chevron-right ms-2"></i>
+                </button>
+                <button class="btn btn-success" id="submitBtn" onclick="confirmSubmission()" style="display: none;">
+                    <i class="fas fa-check me-2"></i>Submit Assessment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/11.10.1/sweetalert2.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/11.10.1/sweetalert2.min.css">
+
+<style>
+.fullscreen-active .navbar, .fullscreen-active nav, .fullscreen-active header { display: none !important; }
+.fullscreen-active .container, .fullscreen-active .w-100 { display: flex; flex-direction: column; justify-content: center; min-height: 100vh; padding: 20px; }
+.no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+body { -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+.option-item.correct { background-color: #d4edda; border: 2px solid #28a745; border-radius: 5px; padding: 8px; }
+.option-item.incorrect { background-color: #f8d7da; border: 2px solid #dc3545; border-radius: 5px; padding: 8px; }
+.option-item.disabled input { pointer-events: none; opacity: 0.6; }
+.answer-feedback .alert-success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+.answer-feedback .alert-danger { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentQuestion = 0;
+let totalQuestions = {{ questions|length }};
+let timeElapsed = 0; // Changed from timeLeft to timeElapsed
+let timer;
+let answers = {};
+let questionIds = [{% for question in questions %}'{{ question.id }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+let shuffledQuestions = [];
+let isFullscreen = false;
+let assessmentCompleted = false;
+let securityViolations = 0;
+let answeredQuestions = new Set();
+let startTime; // Added to track start time
+let examTerminated = false; // Track if exam was terminated due to violations
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeStrictSecurity();
+    shuffleQuestions();
+    startSecureAssessment();
+});
+
+function shuffleQuestions() {
+    shuffledQuestions = Array.from({length: totalQuestions}, (_, i) => i);
+    for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
+    }
+    reorderQuestions();
+}
+
+function reorderQuestions() {
+    const container = document.getElementById('questionContainer');
+    const questions = Array.from(container.children);
+    
+    shuffledQuestions.forEach((originalIndex, newIndex) => {
+        const question = questions[originalIndex];
+        question.setAttribute('data-question', newIndex);
+        question.querySelector('.question-number').textContent = newIndex + 1;
+        question.style.display = newIndex === 0 ? 'block' : 'none';
+        container.appendChild(question);
+    });
+}
+
+function initializeStrictSecurity() {
+    const blockedKeys = [
+        'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+        'Escape', 'PrintScreen', 'ScrollLock', 'Pause', 'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown',
+        'Meta', 'ContextMenu', 'Applications'
+    ];
+    
+    document.addEventListener('keydown', function(e) {
+        // Block all function keys and system keys
+        if (blockedKeys.includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning(`${e.key} key blocked!`);
+            // Terminate exam for ESC and Windows key
+            if (e.key === 'Escape' || e.key === 'Meta') {
+                terminateExamForViolation();
+            }
+            return false;
+        }
+        
+        // Block all Ctrl combinations
+        if (e.ctrlKey) {
+            const blockedCtrlCombos = ['a', 'c', 'v', 'x', 'z', 'y', 's', 'o', 'n', 'w', 't', 'r', 'l', 'h', 'j', 'u', 'i', 'k', 'p', 'f', 'g', 'd', 'b', 'e', 'm'];
+            if (blockedCtrlCombos.includes(e.key.toLowerCase())) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSecurityWarning(`Ctrl+${e.key.toUpperCase()} blocked!`);
+                return false;
+            }
+        }
+        
+        // Block all Alt combinations
+        if (e.altKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning('Alt key combinations blocked!');
+            return false;
+        }
+        
+        // Block Windows key
+        if (e.key === 'Meta' || e.keyCode === 91 || e.keyCode === 92) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning('Windows key blocked!');
+            terminateExamForViolation();
+            return false;
+        }
+        
+        // Block Ctrl+Shift combinations
+        if (e.ctrlKey && e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning('Ctrl+Shift combinations blocked!');
+            return false;
+        }
+    });
+    
+    // Block all mouse interactions except left click on allowed elements
+    document.addEventListener('contextmenu', e => { e.preventDefault(); showSecurityWarning('Right-click disabled!'); });
+    document.addEventListener('mousedown', e => { if (e.button !== 0) { e.preventDefault(); showSecurityWarning('Mouse button blocked!'); } });
+    document.addEventListener('dragstart', e => { e.preventDefault(); return false; });
+    document.addEventListener('selectstart', e => { e.preventDefault(); return false; });
+    
+    // Disable text selection completely
+    document.body.style.webkitUserSelect = 'none';
+    document.body.style.mozUserSelect = 'none';
+    document.body.style.msUserSelect = 'none';
+    document.body.style.userSelect = 'none';
+    
+    // Monitor for developer tools
+    setInterval(() => {
+        if (window.outerHeight - window.innerHeight > 150 || window.outerWidth - window.innerWidth > 150) {
+            securityViolations++;
+            showSecurityWarning('Developer tools detected!');
+            if (securityViolations >= 2) terminateExamForViolation();
+        }
+    }, 1000);
+}
+
+function startSecureAssessment() {
+    Swal.fire({
+        title: 'Secure Assessment Mode',
+        html: `<div class="alert alert-warning"><strong>Security Notice:</strong></div>
+               <ul style="text-align: left; margin: 0; padding-left: 20px;">
+                   <li>All keyboard shortcuts disabled</li>
+                   <li>Questions will be randomized</li>
+                   <li>Immediate answer feedback provided</li>
+                   <li>No answer modifications after selection</li>
+                   <li>Security violations will terminate exam</li>
+               </ul>`,
+        icon: 'warning',
+        confirmButtonText: 'Start Assessment',
+        allowOutsideClick: false,
+        allowEscapeKey: false
+    }).then(() => enterStrictFullscreen());
+}
+
+function enterStrictFullscreen() {
+    const element = document.documentElement;
+    if (element.requestFullscreen) element.requestFullscreen();
+    else if (element.mozRequestFullScreen) element.mozRequestFullScreen();
+    else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
+    else if (element.msRequestFullscreen) element.msRequestFullscreen();
+    
+    document.body.classList.add('fullscreen-active');
+    isFullscreen = true;
+    
+    setTimeout(() => {
+        setupStrictMonitoring();
+        startAssessment();
+    }, 1000);
+}
+
+function setupStrictMonitoring() {
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+        .forEach(event => document.addEventListener(event, handleFullscreenExit));
+    
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && isFullscreen && !assessmentCompleted && !examTerminated) {
+            showSecurityWarning('Tab switching detected!');
+            setTimeout(() => terminateExamForViolation(), 2000);
+        }
+    });
+    
+    window.addEventListener('blur', () => {
+        if (isFullscreen && !assessmentCompleted && !examTerminated) {
+            setTimeout(() => {
+                if (!document.hasFocus()) {
+                    showSecurityWarning('Window focus lost!');
+                    setTimeout(() => terminateExamForViolation(), 1000);
+                }
+            }, 500);
+        }
+    });
+}
+
+function handleFullscreenExit() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+        !document.mozFullScreenElement && !document.msFullscreenElement) {
+        if (isFullscreen && !assessmentCompleted && !examTerminated) {
+            showSecurityWarning('Fullscreen violation!');
+            setTimeout(() => terminateExamForViolation(), 2000);
+        }
+    }
+}
+
+function showSecurityWarning(message) {
+    Swal.fire({
+        title: 'Security Violation',
+        text: message,
+        icon: 'error',
+        timer: 2000,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false
+    });
+}
+
+function startAssessment() {
+    startTime = new Date(); // Record start time
+    startTimer();
+    updateProgress();
+    updateNavigationButtons();
+    
+    Swal.fire({
+        title: 'Assessment Started',
+        text: 'Questions randomized. Good luck!',
+        icon: 'success',
+        timer: 2000,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false
+    });
+}
+
+// Modified timer function to count up instead of down
+function startTimer() {
+    clearInterval(timer);
+    updateTimerDisplay();
+    
+    timer = setInterval(() => {
+        if (assessmentCompleted || examTerminated) {
+            clearInterval(timer);
+            return;
+        }
+        
+        timeElapsed++; // Increment instead of decrement
+        updateTimerDisplay();
+        
+    }, 1000);
+}
+
+// Modified timer display to show elapsed time
+function updateTimerDisplay() {
+    const minutes = Math.floor(timeElapsed / 60);
+    const seconds = timeElapsed % 60;
+    const timerElement = document.getElementById('timer');
+    
+    timerElement.textContent = (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    // Keep it blue/primary color since it's just showing elapsed time
+    timerElement.className = 'timer-display text-primary';
+}
+
+function handleAnswerChange(selectedInput) {
+    if (assessmentCompleted || examTerminated) return;
+    
+    const questionElement = selectedInput.closest('.question-slide');
+    const questionId = questionElement.getAttribute('data-question-id');
+    const correctAnswer = questionElement.getAttribute('data-correct-answer');
+    const selectedValue = selectedInput.value;
+    
+    // Save answer
+    answers[questionId] = selectedValue;
+    answeredQuestions.add(questionId);
+    
+    // Disable all options in this question
+    const allInputs = questionElement.querySelectorAll('input[type="radio"]');
+    const allOptions = questionElement.querySelectorAll('.option-item');
+    
+    allInputs.forEach(input => {
+        input.disabled = true;
+        input.parentElement.classList.add('disabled');
+    });
+    
+    // Show feedback
+    const feedbackDiv = questionElement.querySelector('.answer-feedback');
+    const alertDiv = feedbackDiv.querySelector('.alert');
+    
+    if (selectedValue === correctAnswer) {
+        selectedInput.parentElement.classList.add('correct');
+        alertDiv.className = 'alert alert-success';
+        alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i><strong>Correct!</strong> Well done.';
+    } else {
+        selectedInput.parentElement.classList.add('incorrect');
+        // Highlight correct answer
+        allOptions.forEach(option => {
+            const input = option.querySelector('input');
+            if (input.value === correctAnswer) {
+                option.classList.add('correct');
+            }
+        });
+        alertDiv.className = 'alert alert-danger';
+        alertDiv.innerHTML = `<i class="fas fa-times-circle me-2"></i><strong>Incorrect.</strong> The correct answer is: <strong>${correctAnswer}</strong>`;
+    }
+    
+    feedbackDiv.style.display = 'block';
+    
+    
+}
+
+function changeQuestion(direction) {
+    if (assessmentCompleted || examTerminated) return;
+    
+    const currentSlide = document.querySelector(`[data-question="${currentQuestion}"]`);
+    if (currentSlide) currentSlide.style.display = 'none';
+    
+    const newQuestion = currentQuestion + direction;
+    if (newQuestion >= 0 && newQuestion < totalQuestions) {
+        currentQuestion = newQuestion;
+        const newSlide = document.querySelector(`[data-question="${currentQuestion}"]`);
+        if (newSlide) newSlide.style.display = 'block';
+        
+        updateProgress();
+        updateNavigationButtons();
+    }
+}
+
+function updateProgress() {
+    const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+    document.getElementById('progressBar').style.width = progress + '%';
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const exitBtn = document.getElementById('exitBtn');
+    
+    prevBtn.disabled = currentQuestion === 0 || assessmentCompleted || examTerminated;
+    
+    if (isFullscreen) exitBtn.style.display = 'inline-block';
+    
+    if (currentQuestion === totalQuestions - 1) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'inline-block';
+    } else {
+        nextBtn.style.display = 'inline-block';
+        nextBtn.disabled = assessmentCompleted || examTerminated;
+        submitBtn.style.display = 'none';
+    }
+}
+
+function confirmExitExam() {
+    const totalTime = formatTime(timeElapsed);
+    Swal.fire({
+        title: 'Exit Exam?',
+        html: `<p><strong>This will submit your current answers.</strong></p>
+               <p>Answered: <strong>${answeredQuestions.size} of ${totalQuestions}</strong></p>
+               <p>Time taken: <strong>${totalTime}</strong></p>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Exit',
+        cancelButtonText: 'No',
+        confirmButtonColor: '#dc3545',
+        allowOutsideClick: false
+    }).then(result => {
+        if (result.isConfirmed) submitAssessment();
+    });
+}
+
+function confirmSubmission() {
+    if (assessmentCompleted || examTerminated) return;
+    
+    const totalTime = formatTime(timeElapsed);
+    Swal.fire({
+        title: 'Submit Assessment?',
+        html: `<p><strong>Answered:</strong> ${answeredQuestions.size} of ${totalQuestions}</p>
+               <p><strong>Time taken:</strong> ${totalTime}</p>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Submit',
+        cancelButtonText: 'Continue',
+        confirmButtonColor: '#28a745',
+        allowOutsideClick: false
+    }).then(result => {
+        if (result.isConfirmed) submitAssessment();
+    });
+}
+
+// Helper function to format time
+function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
+}
+
+// New function to terminate exam due to security violations
+function terminateExamForViolation() {
+    if (assessmentCompleted || examTerminated) return;
+    
+    examTerminated = true;
+    clearInterval(timer);
+    
+    // Exit fullscreen mode
+    exitFullscreenMode();
+    
+    // Show violation message instead of score
+    Swal.fire({
+        title: 'Exam Terminated',
+        html: `<div class="text-center">
+                   <i class="fas fa-exclamation-triangle text-danger" style="font-size: 4rem; margin-bottom: 20px;"></i>
+                   <h4 class="text-danger">Security Rule Violation Detected</h4>
+                   <p class="text-muted">The examination has been terminated due to violation of security rules.</p>
+                   <p class="text-muted">Please contact the administrator for further assistance.</p>
+               </div>`,
+        icon: 'error',
+        confirmButtonText: 'Exit',
+        confirmButtonColor: '#dc3545',
+        allowOutsideClick: false,
+        allowEscapeKey: false
+    }).then(() => {
+        // Redirect to home page or previous page
+        window.location.href = '/'; // Redirect to home page
+    });
+}
+
+function submitAssessment() {
+    if (assessmentCompleted || examTerminated) return;
+    
+    assessmentCompleted = true;
+    clearInterval(timer);
+    
+    Swal.fire({
+        title: 'Submitting...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => Swal.showLoading()
+    });
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "submit_assessment" assessment.id %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            answers: answers,
+            security_violations: securityViolations,
+            question_order: shuffledQuestions,
+            time_taken: timeElapsed // Send elapsed time to backend
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            exitFullscreenMode();
+            const finalTime = formatTime(timeElapsed);
+            Swal.fire({
+                title: 'Assessment Completed!',
+                html: `<h4>Score: <span class="text-success">${data.score}%</span></h4>
+                       <h5>Time Duration: <span class="text-info">${finalTime}</span></h5>
+                       <p class="text-success mt-2"><i class="fas fa-check-circle"></i> This time duration is sufficient for completing the assessment.</p>
+                       <p>Redirecting in 5 seconds...</p>`,
+                icon: 'success',
+                timer: 5000,
+                timerProgressBar: true,
+                showConfirmButton: true,
+                confirmButtonText: 'Continue'
+            }).then(() => {
+                window.location.href = data.redirect_url;
+            });
+        } else {
+            assessmentCompleted = false;
+            Swal.fire({
+                title: 'Error',
+                text: data.error || 'Submission failed',
+                icon: 'error',
+                confirmButtonText: 'Try Again'
+            });
+        }
+    })
+    .catch(error => {
+        assessmentCompleted = false;
+        Swal.fire({
+            title: 'Error',
+            text: 'Network error: ' + error.message,
+            icon: 'error',
+            confirmButtonText: 'Try Again'
+        });
+    });
+}
+
+function exitFullscreenMode() {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+    else if (document.msExitFullscreen) document.msExitFullscreen();
+    
+    document.body.classList.remove('fullscreen-active');
+    isFullscreen = false;
+}
+
+window.addEventListener('beforeunload', e => {
+    if (isFullscreen && !assessmentCompleted && !examTerminated) {
+        const msg = 'Assessment in progress!';
+        e.returnValue = msg;
+        setTimeout(() => { if (!assessmentCompleted && !examTerminated) terminateExamForViolation(); }, 100);
+        return msg;
+    }
+});
+</script>
+{% endblock %}
