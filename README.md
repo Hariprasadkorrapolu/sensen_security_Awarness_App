@@ -22,7 +22,7 @@ This project demonstrates a **full-stack Django application** integrated with **
   - Total assessments passed
   - User progress overview  
 - Quick navigation to Tutorials, Assessments, and Profile sections  
-![Home Page](screenshots/home_placeholder.png)
+![Home Page](sensen_security/screenshots/home_placeholder.png)
 
 ### 📝 Assessments
 - Secure exam environment with:
@@ -30,22 +30,22 @@ This project demonstrates a **full-stack Django application** integrated with **
   - Tab switching restrictions
   - Locked answers on re-attempts
   - Prevents cheating and ensures integrity  
-![Assessments Page](screenshots/assessments_placeholder.png)
+![Assessments Page](sensen_security/screenshots/assessments_placeholder.png)
 
 ### 🎥 Tutorials
 - Interactive video tutorials on security awareness topics  
 - Multi-format video support for learning flexibility  
-![Tutorials Page](screenshots/tutorials_placeholder.png)
+![Tutorials Page](sensen_security/screenshots/tutorials_placeholder.png)
 
 ### 📤 Upload Section
 - Users can securely upload documents or assignments  
 - Backend validation ensures file security  
-![Upload Page](screenshots/upload_placeholder.png)
+![Upload Page](sensen_security/screenshots/upload_placeholder.png)
 
 ### 👤 Profile Management
 - View and update personal details  
-- Update profile information securely and efficiently  
-![Profile Page](screenshots/profile_placeholder.png)
+- Profile customization and secure account management  
+![Profile Page](sensen_security/screenshots/profile_placeholder.png)
 
 ---
 
