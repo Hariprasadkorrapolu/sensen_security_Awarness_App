@@ -28,7 +28,7 @@ This project demonstrates a **full-stack Django application** integrated with **
 - Secure exam environment with:
   - Disabled keyboard shortcuts (Ctrl+C, Ctrl+V, Delete)
   - Tab switching restrictions
-  - Locked answers on re-attempts
+  - Always questions have been changing on re-attempts
   - Prevents cheating and ensures integrity  
 ![Assessments Page](final_sensen_security/sensen_security/screenshots/assessments_placeholder.jpg)
 
